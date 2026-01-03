@@ -48,7 +48,7 @@ const SETS = {
   }
 };
 
-let COLOR_PALETTE = SETS['Any'];
+let COLOR_PALETTE = SETS['The Sith'];
 
 const colorDistance = (c1, c2) => Math.sqrt((c1[0]-c2[0])**2 + (c1[1]-c2[1])**2 + (c1[2]-c2[2])**2);
 
@@ -266,7 +266,127 @@ const STRATEGY_INFO = {
   weighted_depletion: 'Balances distance with inventory'
 };
 
+function ImageCropper({ image, onCrop, onCancel }) {
+  const containerRef = useRef(null);
+  const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 });
+  const [cropBox, setCropBox] = useState({ x: 0, y: 0, size: 100 });
+  const [dragging, setDragging] = useState(null);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0, cropX: 0, cropY: 0, cropSize: 0 });
+
+  useEffect(() => {
+    if (!containerRef.current || !image) return;
+    const maxW = Math.min(containerRef.current.offsetWidth - 32, 500);
+    const maxH = window.innerHeight * 0.5;
+    const scale = Math.min(maxW / image.width, maxH / image.height, 1);
+    const w = image.width * scale;
+    const h = image.height * scale;
+    setDisplaySize({ width: w, height: h });
+    const size = Math.min(w, h) * 0.8;
+    setCropBox({ x: (w - size) / 2, y: (h - size) / 2, size });
+  }, [image]);
+
+  const getPos = (e) => {
+    const rect = containerRef.current.querySelector('img').getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  };
+
+  const handleStart = (e, type) => {
+    e.preventDefault();
+    const pos = getPos(e);
+    setDragging(type);
+    setDragStart({ x: pos.x, y: pos.y, cropX: cropBox.x, cropY: cropBox.y, cropSize: cropBox.size });
+  };
+
+  const handleMove = useCallback((e) => {
+    if (!dragging) return;
+    e.preventDefault();
+    const pos = getPos(e);
+    const dx = pos.x - dragStart.x;
+    const dy = pos.y - dragStart.y;
+
+    setCropBox(prev => {
+      if (dragging === 'move') {
+        const newX = Math.max(0, Math.min(displaySize.width - prev.size, dragStart.cropX + dx));
+        const newY = Math.max(0, Math.min(displaySize.height - prev.size, dragStart.cropY + dy));
+        return { ...prev, x: newX, y: newY };
+      } else {
+        const delta = Math.max(dx, dy);
+        const newSize = Math.max(50, Math.min(
+          dragStart.cropSize + delta,
+          displaySize.width - dragStart.cropX,
+          displaySize.height - dragStart.cropY
+        ));
+        return { ...prev, size: newSize };
+      }
+    });
+  }, [dragging, dragStart, displaySize]);
+
+  const handleEnd = useCallback(() => setDragging(null), []);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const opts = { passive: false };
+    window.addEventListener('mousemove', handleMove, opts);
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchmove', handleMove, opts);
+    window.addEventListener('touchend', handleEnd);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleEnd);
+    };
+  }, [dragging, handleMove, handleEnd]);
+
+  const handleCrop = () => {
+    const scale = image.width / displaySize.width;
+    onCrop({ x: cropBox.x * scale, y: cropBox.y * scale, size: cropBox.size * scale });
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <p className="text-zinc-400 text-center mb-4">Drag to position, drag corner to resize</p>
+      <div ref={containerRef} className="flex justify-center">
+        <div className="relative select-none touch-none" style={{ width: displaySize.width, height: displaySize.height }}>
+          <img src={image.src} alt="Crop" className="w-full h-full" draggable={false} />
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute bg-black/60" style={{ top: 0, left: 0, right: 0, height: cropBox.y }} />
+            <div className="absolute bg-black/60" style={{ top: cropBox.y + cropBox.size, left: 0, right: 0, bottom: 0 }} />
+            <div className="absolute bg-black/60" style={{ top: cropBox.y, left: 0, width: cropBox.x, height: cropBox.size }} />
+            <div className="absolute bg-black/60" style={{ top: cropBox.y, left: cropBox.x + cropBox.size, right: 0, height: cropBox.size }} />
+          </div>
+          <div
+            className="absolute border-2 border-white cursor-move"
+            style={{ left: cropBox.x, top: cropBox.y, width: cropBox.size, height: cropBox.size }}
+            onMouseDown={(e) => handleStart(e, 'move')}
+            onTouchStart={(e) => handleStart(e, 'move')}
+          >
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute top-1/3 left-0 right-0 border-t border-white/40" />
+              <div className="absolute top-2/3 left-0 right-0 border-t border-white/40" />
+              <div className="absolute left-1/3 top-0 bottom-0 border-l border-white/40" />
+              <div className="absolute left-2/3 top-0 bottom-0 border-l border-white/40" />
+            </div>
+            <div
+              className="absolute -bottom-3 -right-3 w-6 h-6 bg-white rounded-full cursor-se-resize"
+              onMouseDown={(e) => { e.stopPropagation(); handleStart(e, 'resize'); }}
+              onTouchStart={(e) => { e.stopPropagation(); handleStart(e, 'resize'); }}
+            />
+          </div>
+        </div>
+      </div>
+      <div className="flex gap-3 mt-6">
+        <button onClick={onCancel} className="flex-1 py-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium">Cancel</button>
+        <button onClick={handleCrop} className="flex-1 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium">Crop & Continue</button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  const [originalImage, setOriginalImage] = useState(null);
   const [pixels, setPixels] = useState(null);
   const [result, setResult] = useState(null);
   const [strategy, setStrategy] = useState('weighted_depletion');
@@ -274,6 +394,7 @@ export default function App() {
   const [view, setView] = useState('preview');
   const [quadrant, setQuadrant] = useState(0);
   const [dragOver, setDragOver] = useState(false);
+  const [cropping, setCropping] = useState(false);
   const canvasRef = useRef(null);
   const hiddenCanvasRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -282,20 +403,23 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
-      img.onload = () => {
-        const canvas = hiddenCanvasRef.current;
-        canvas.width = 48; canvas.height = 48;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, 48, 48);
-        const data = ctx.getImageData(0, 0, 48, 48).data;
-        const pxls = [];
-        for (let i = 0; i < data.length; i += 4) pxls.push([data[i], data[i+1], data[i+2]]);
-        setPixels(pxls);
-      };
+      img.onload = () => { setOriginalImage(img); setCropping(true); };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
   }, []);
+
+  const handleCrop = useCallback((cropData) => {
+    const canvas = hiddenCanvasRef.current;
+    canvas.width = 48; canvas.height = 48;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(originalImage, cropData.x, cropData.y, cropData.size, cropData.size, 0, 0, 48, 48);
+    const data = ctx.getImageData(0, 0, 48, 48).data;
+    const pxls = [];
+    for (let i = 0; i < data.length; i += 4) pxls.push([data[i], data[i+1], data[i+2]]);
+    setPixels(pxls);
+    setCropping(false);
+  }, [originalImage]);
 
   const handleDrop = useCallback((e) => {
     e.preventDefault();
@@ -307,8 +431,7 @@ export default function App() {
   useEffect(() => {
     if (!pixels) return;
     COLOR_PALETTE = SETS[selectedSet];
-    const fn = strategies[strategy];
-    const res = fn(pixels, 42, 48);
+    const res = strategies[strategy](pixels, 42, 48);
     setResult(res);
   }, [pixels, strategy, selectedSet]);
 
@@ -316,47 +439,44 @@ export default function App() {
     if (!result || !canvasRef.current || view !== 'preview') return;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    const size = 10, studSize = 8;
     canvas.width = 480; canvas.height = 480;
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, 480, 480);
-    
     for (let i = 0; i < result.length; i++) {
-      const x = (i % 48) * size + size/2, y = Math.floor(i / 48) * size + size/2;
+      const x = (i % 48) * 10 + 5, y = Math.floor(i / 48) * 10 + 5;
       const rgb = COLOR_PALETTE[result[i]].rgb;
-      const grad = ctx.createRadialGradient(x-1, y-1, 0, x, y, studSize/2);
-      grad.addColorStop(0, `rgba(255,255,255,0.25)`);
+      const grad = ctx.createRadialGradient(x-1, y-1, 0, x, y, 4);
+      grad.addColorStop(0, 'rgba(255,255,255,0.25)');
       grad.addColorStop(0.5, `rgb(${rgb.join(',')})`);
-      grad.addColorStop(1, `rgba(0,0,0,0.3)`);
+      grad.addColorStop(1, 'rgba(0,0,0,0.3)');
       ctx.beginPath();
-      ctx.arc(x, y, studSize/2, 0, Math.PI * 2);
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
       ctx.fillStyle = grad;
       ctx.fill();
     }
   }, [result, view]);
 
+  const resetAll = () => { setOriginalImage(null); setPixels(null); setResult(null); setCropping(false); };
   const colorCounts = result ? result.reduce((acc, c) => { acc[c] = (acc[c]||0) + 1; return acc; }, {}) : {};
   const activePalette = SETS[selectedSet];
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4 sm:p-6 overflow-x-hidden">
       <canvas ref={hiddenCanvasRef} className="hidden" />
-      
       <div className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">
-          Lego Mosaic Builder
-        </h1>
+        <h1 className="text-3xl font-bold mb-6">Mosaic Builder</h1>
 
-        {!pixels && (
+        {cropping && originalImage && (
+          <ImageCropper image={originalImage} onCrop={handleCrop} onCancel={() => { setOriginalImage(null); setCropping(false); }} />
+        )}
+
+        {!pixels && !cropping && (
           <div className="max-w-2xl mx-auto">
-            <div className="text-center mb-8">
-              <p className="text-lg text-zinc-400 leading-relaxed">
-                Transform any image into a buildable brick mosaic. Upload a photo and we'll convert it to a 48×48 stud design using the colors available in official LEGO Art sets, complete with building instructions and a parts list.
-              </p>
-            </div>
-
+            <p className="text-lg text-zinc-400 text-center mb-8">
+              Transform any image into a buildable brick mosaic. Upload a photo and we'll convert it to a 48×48 stud design using the colors available in official LEGO Art sets, complete with building instructions and a parts list.
+            </p>
             <div
-              className={`rounded-2xl p-12 text-center cursor-pointer transition-all border-2 border-dashed ${dragOver ? 'border-blue-500 bg-blue-500/10' : 'border-zinc-700 hover:border-zinc-500'}`}
+              className={`rounded-2xl p-12 text-center cursor-pointer border-2 border-dashed transition-all ${dragOver ? 'border-blue-500 bg-blue-500/10' : 'border-zinc-700 hover:border-zinc-500'}`}
               onClick={() => fileInputRef.current?.click()}
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
@@ -365,67 +485,53 @@ export default function App() {
               <div className="text-5xl mb-4 opacity-50">📷</div>
               <p className="text-xl text-zinc-300 mb-2">Drop an image here or click to browse</p>
               <p className="text-sm text-zinc-500">Supports JPG, PNG, and other common formats</p>
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
-                onChange={(e) => e.target.files[0] && loadImage(e.target.files[0])} />
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files[0] && loadImage(e.target.files[0])} />
             </div>
-
             <div className="grid grid-cols-3 gap-4 mt-8 text-center">
               <div className="bg-zinc-900 rounded-xl p-4">
                 <div className="text-2xl mb-2">🎨</div>
                 <h3 className="font-medium text-zinc-200 mb-1">7 Algorithms</h3>
-                <p className="text-xs text-zinc-500">Different dithering strategies for the best result</p>
+                <p className="text-xs text-zinc-500">Different dithering strategies</p>
               </div>
               <div className="bg-zinc-900 rounded-xl p-4">
                 <div className="text-2xl mb-2">📋</div>
                 <h3 className="font-medium text-zinc-200 mb-1">Instructions</h3>
-                <p className="text-xs text-zinc-500">Section-by-section building guide</p>
+                <p className="text-xs text-zinc-500">Section-by-section guide</p>
               </div>
               <div className="bg-zinc-900 rounded-xl p-4">
                 <div className="text-2xl mb-2">🧱</div>
                 <h3 className="font-medium text-zinc-200 mb-1">Parts List</h3>
-                <p className="text-xs text-zinc-500">Track usage against your set's inventory</p>
+                <p className="text-xs text-zinc-500">Track your inventory</p>
               </div>
             </div>
           </div>
         )}
 
-        {pixels && result && (
+        {pixels && result && !cropping && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="space-y-4">
               <div className="bg-zinc-900 rounded-xl p-4 space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-zinc-400 mb-2">Set</label>
-                  <select value={selectedSet} onChange={(e) => setSelectedSet(e.target.value)}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-zinc-100 focus:outline-none focus:border-blue-500">
+                  <select value={selectedSet} onChange={(e) => setSelectedSet(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-zinc-100">
                     {Object.keys(SETS).map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
-                
                 <div>
                   <label className="block text-sm font-medium text-zinc-400 mb-2">Strategy</label>
-                  <select value={strategy} onChange={(e) => setStrategy(e.target.value)}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-zinc-100 focus:outline-none focus:border-blue-500">
-                    {Object.keys(strategies).map(s => (
-                      <option key={s} value={s}>{s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
-                    ))}
+                  <select value={strategy} onChange={(e) => setStrategy(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-zinc-100">
+                    {Object.keys(strategies).map(s => <option key={s} value={s}>{s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>)}
                   </select>
                   <p className="text-xs text-zinc-500 mt-2">{STRATEGY_INFO[strategy]}</p>
                 </div>
               </div>
-
-              <button onClick={() => { setPixels(null); setResult(null); }}
-                className="w-full py-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium transition-colors">
-                Upload New Image
-              </button>
+              <button onClick={resetAll} className="w-full py-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium">Upload New Image</button>
             </div>
 
             <div className="lg:col-span-2 space-y-4">
               <div className="flex bg-zinc-900 rounded-xl p-1">
                 {[['preview', 'Preview'], ['instructions', 'Instructions'], ['parts', 'Parts']].map(([v, label]) => (
-                  <button key={v} onClick={() => setView(v)}
-                    className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${view === v ? 'bg-blue-600 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}>
-                    {label}
-                  </button>
+                  <button key={v} onClick={() => setView(v)} className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${view === v ? 'bg-blue-600 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}>{label}</button>
                 ))}
               </div>
 
@@ -441,8 +547,7 @@ export default function App() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-2">
                     {[...Array(9)].map((_, i) => (
-                      <button key={i} onClick={() => setQuadrant(i)}
-                        className={`py-2 rounded-lg font-medium transition-colors ${quadrant === i ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}>
+                      <button key={i} onClick={() => setQuadrant(i)} className={`py-2 rounded-lg font-medium ${quadrant === i ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}>
                         {Math.floor(i/3)+1}-{i%3+1}
                       </button>
                     ))}
@@ -451,14 +556,13 @@ export default function App() {
                     <div className="grid gap-0.5 mx-auto" style={{ gridTemplateColumns: 'repeat(16, 1fr)', maxWidth: '100%' }}>
                       {[...Array(256)].map((_, i) => {
                         const qRow = Math.floor(quadrant / 3), qCol = quadrant % 3;
-                        const x = i % 16, y = Math.floor(i / 16);
-                        const px = qCol * 16 + x, py = qRow * 16 + y;
+                        const px = qCol * 16 + (i % 16), py = qRow * 16 + Math.floor(i / 16);
                         const colorNum = result[py * 48 + px];
                         const rgb = COLOR_PALETTE[colorNum].rgb;
-                        const brightness = 0.299*rgb[0] + 0.587*rgb[1] + 0.114*rgb[2];
+                        const bright = 0.299*rgb[0] + 0.587*rgb[1] + 0.114*rgb[2];
                         return (
-                          <div key={i} className="aspect-square rounded-full flex items-center justify-center text-xs font-bold"
-                            style={{ backgroundColor: `rgb(${rgb.join(',')})`, color: brightness > 128 ? '#000' : '#fff', fontSize: '10px' }}>
+                          <div key={i} className="aspect-square rounded-full flex items-center justify-center font-bold"
+                            style={{ backgroundColor: `rgb(${rgb.join(',')})`, color: bright > 128 ? '#000' : '#fff', fontSize: '10px' }}>
                             {colorNum}
                           </div>
                         );
@@ -471,31 +575,22 @@ export default function App() {
               {view === 'parts' && (
                 <div className="bg-zinc-900 rounded-xl p-4 space-y-3">
                   {Object.entries(activePalette).filter(([k]) => colorCounts[k] > 0).map(([k, v]) => {
-                    const count = colorCounts[k];
-                    const pct = (count / v.count) * 100;
-                    const over = pct > 100;
-                    const bricklinkUrl = v.bricklinkColor ? `https://www.bricklink.com/v2/catalog/catalogitem.page?P=98138&C=${v.bricklinkColor}` : null;
+                    const count = colorCounts[k], pct = (count / v.count) * 100, over = pct > 100;
+                    const url = v.bricklinkColor ? `https://www.bricklink.com/v2/catalog/catalogitem.page?P=98138&C=${v.bricklinkColor}` : null;
                     return (
                       <div key={k} className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold"
-                          style={{ backgroundColor: `rgb(${v.rgb.join(',')})`, color: (0.299*v.rgb[0] + 0.587*v.rgb[1] + 0.114*v.rgb[2]) > 128 ? '#000' : '#fff' }}>
-                          {k}
-                        </div>
+                          style={{ backgroundColor: `rgb(${v.rgb.join(',')})`, color: (0.299*v.rgb[0] + 0.587*v.rgb[1] + 0.114*v.rgb[2]) > 128 ? '#000' : '#fff' }}>{k}</div>
                         <div className="flex-1 min-w-0">
                           <div className="flex justify-between text-sm mb-1">
                             <span className="text-zinc-300 capitalize truncate">{v.name.replace(/_/g, ' ')}</span>
                             <span className={`font-medium ${over ? 'text-red-400' : 'text-zinc-400'}`}>{count}</span>
                           </div>
                           <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: over ? '#ef4444' : '#22c55e' }} />
+                            <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: over ? '#ef4444' : '#22c55e' }} />
                           </div>
                         </div>
-                        {bricklinkUrl && (
-                          <a href={bricklinkUrl} target="_blank" rel="noopener noreferrer"
-                            className="text-xs text-blue-400 hover:text-blue-300 flex-shrink-0">
-                            Buy
-                          </a>
-                        )}
+                        {url && <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300">Buy</a>}
                       </div>
                     );
                   })}
