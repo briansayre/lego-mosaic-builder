@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 
 const SETS = {
-  'Any': {
+  'BrickLink': {
     1: { name: 'white', rgb: [255, 255, 255], count: 2304, bricklinkColor: 1 },
     2: { name: 'light_grey', rgb: [180, 180, 180], count: 2304, bricklinkColor: 86 },
     3: { name: 'grey', rgb: [128, 128, 128], count: 2304, bricklinkColor: 9 },
@@ -34,7 +34,7 @@ const SETS = {
   },
   'The Sith': {
     1: { name: 'black', rgb: [10, 10, 10], count: 877 },
-    2: { name: 'titanium', rgb: [168, 63, 58], count: 271 },
+    2: { name: 'titanium', rgb: [68, 63, 58], count: 271 },
     3: { name: 'dark_grey', rgb: [102, 101, 97], count: 151 },
     4: { name: 'stone_grey', rgb: [167, 166, 163], count: 110 },
     5: { name: 'sand_blue', rgb: [108, 134, 157], count: 139 },
@@ -464,7 +464,7 @@ export default function App() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4 sm:p-6 overflow-x-hidden">
       <canvas ref={hiddenCanvasRef} className="hidden" />
       <div className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Mosaic Builder</h1>
+        <h1 className="text-3xl font-bold mb-6">Lego Mosaic Builder</h1>
 
         {cropping && originalImage && (
           <ImageCropper image={originalImage} onCrop={handleCrop} onCancel={() => { setOriginalImage(null); setCropping(false); }} />
@@ -473,7 +473,7 @@ export default function App() {
         {!pixels && !cropping && (
           <div className="max-w-2xl mx-auto">
             <p className="text-lg text-zinc-400 text-center mb-8">
-              Transform any image into a buildable brick mosaic. Upload a photo and we'll convert it to a 48×48 stud design using the colors available in official LEGO Art sets, complete with building instructions and a parts list.
+              Transform any image into a buildable Lego mosaic. Upload a photo and we'll convert it to a 48×48 stud design using the colors available in official LEGO Art sets or on BrickLink, complete with building instructions and a parts list.
             </p>
             <div
               className={`rounded-2xl p-12 text-center cursor-pointer border-2 border-dashed transition-all ${dragOver ? 'border-blue-500 bg-blue-500/10' : 'border-zinc-700 hover:border-zinc-500'}`}
@@ -484,13 +484,12 @@ export default function App() {
             >
               <div className="text-5xl mb-4 opacity-50">📷</div>
               <p className="text-xl text-zinc-300 mb-2">Drop an image here or click to browse</p>
-              <p className="text-sm text-zinc-500">Supports JPG, PNG, and other common formats</p>
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files[0] && loadImage(e.target.files[0])} />
             </div>
             <div className="grid grid-cols-3 gap-4 mt-8 text-center">
               <div className="bg-zinc-900 rounded-xl p-4">
                 <div className="text-2xl mb-2">🎨</div>
-                <h3 className="font-medium text-zinc-200 mb-1">7 Algorithms</h3>
+                <h3 className="font-medium text-zinc-200 mb-1">Algorithms</h3>
                 <p className="text-xs text-zinc-500">Different dithering strategies</p>
               </div>
               <div className="bg-zinc-900 rounded-xl p-4">
