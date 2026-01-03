@@ -339,7 +339,7 @@ export default function App() {
   const activePalette = SETS[selectedSet];
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 p-6">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4 sm:p-6 overflow-x-hidden">
       <canvas ref={hiddenCanvasRef} className="hidden" />
       
       <div className="max-w-5xl mx-auto">
@@ -431,7 +431,9 @@ export default function App() {
 
               {view === 'preview' && (
                 <div className="bg-zinc-900 rounded-xl p-4 flex justify-center">
-                  <canvas ref={canvasRef} className="rounded-lg" />
+                  <div className="w-full" style={{ maxWidth: '480px' }}>
+                    <canvas ref={canvasRef} className="rounded-lg w-full h-auto" />
+                  </div>
                 </div>
               )}
 
@@ -446,7 +448,7 @@ export default function App() {
                     ))}
                   </div>
                   <div className="bg-zinc-900 rounded-xl p-4">
-                    <div className="grid gap-0.5 mx-auto" style={{ gridTemplateColumns: 'repeat(16, 1fr)', maxWidth: '560px' }}>
+                    <div className="grid gap-0.5 mx-auto" style={{ gridTemplateColumns: 'repeat(16, 1fr)', maxWidth: '100%' }}>
                       {[...Array(256)].map((_, i) => {
                         const qRow = Math.floor(quadrant / 3), qCol = quadrant % 3;
                         const x = i % 16, y = Math.floor(i / 16);
