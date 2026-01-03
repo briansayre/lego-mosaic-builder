@@ -490,7 +490,7 @@ export default function App() {
               <div className="bg-zinc-900 rounded-xl p-4">
                 <div className="text-2xl mb-2">🎨</div>
                 <h3 className="font-medium text-zinc-200 mb-1">Algorithms</h3>
-                <p className="text-xs text-zinc-500">Different dithering strategies</p>
+                <p className="text-xs text-zinc-500">Different color assignment strategies</p>
               </div>
               <div className="bg-zinc-900 rounded-xl p-4">
                 <div className="text-2xl mb-2">📋</div>
